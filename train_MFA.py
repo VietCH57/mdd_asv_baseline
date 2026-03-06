@@ -71,6 +71,7 @@ def collate_fn(batch):
             cols['outputlengths'].append(len(row[2]))
             row[2].extend([68] * (max_col[2] - len(row[2])))
             cols['transcript'].append(row[2])
+            error = ast.literal_eval(row[3])
             error.extend([2] * (max_col[3] - len(error)))
             cols['error'].append(error)
         
