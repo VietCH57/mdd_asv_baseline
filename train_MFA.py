@@ -19,7 +19,7 @@ import ast
 parser = argparse.ArgumentParser()
 parser.add_argument('--epochs', type=int, default=100)
 parser.add_argument('--batch_size', type=int, default=4)
-parser.add_argument('--lr', type=float, default=1e-5)
+parser.add_argument('--lr', type=float, default=5e-6)
 parser.add_argument('--eval_start_epoch', type=int, default=5)
 args = parser.parse_args()
 
@@ -100,7 +100,7 @@ decoder_ctc = build_ctcdecoder(
                               )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-ctc_loss = nn.CTCLoss(blank = 68)
+ctc_loss = nn.CTCLoss(blank=68, zero_infinity=True)
 
 for epoch in range(num_epoch):
   model.train().to(device)
@@ -126,7 +126,10 @@ for epoch in range(num_epoch):
     optimizer.zero_grad()
     # break
   # scheduler.step()
-  print(f"Training loss: {sum(running_loss) / len(running_loss)}")
+  if running_loss:
+    print(f"Training loss: {sum(running_loss) / len(running_loss):.4f}")
+  else:
+    print("Training loss: ALL batches were NaN — check model/data.")
   if epoch >= args.eval_start_epoch:
     with torch.no_grad():
       model.eval().to(device)
