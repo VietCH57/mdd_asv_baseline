@@ -1,4 +1,5 @@
 
+import argparse
 from jiwer import wer
 from transformers import Wav2Vec2FeatureExtractor
 import torch, json, os, librosa, transformers, gc
@@ -11,14 +12,22 @@ import numpy as np
 from tqdm import tqdm
 from dataloader import MDD_Dataset
 from MDD_model import MFA_Wav2Vec2_Linguistic
+from config import DATA_ROOT, LABEL_ROOT, WAV_SUFFIX, CHECKPOINT_DIR
 from pyctcdecode import build_ctcdecoder
 import ast
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--batch_size', type=int, default=4)
+parser.add_argument('--lr', type=float, default=1e-5)
+parser.add_argument('--eval_start_epoch', type=int, default=5)
+args = parser.parse_args()
 
 feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, padding_side='right', do_normalize=True, return_attention_mask=False)
 min_wer = 100
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-num_epoch = 100
-batch_size = 4
+num_epoch = args.epochs
+batch_size = args.batch_size
 
 gc.collect()
 with open('vocab.json') as adsfs:
@@ -75,12 +84,12 @@ def collate_fn(batch):
     
     return input_values, cols['linguistic'], cols['transcript'], cols['error'], cols['outputlengths'], cols['canonical_time']
   
-df_train = pd.read_csv('./train_time.csv')
-df_dev = pd.read_csv("./dev_time.csv")
+df_train = pd.read_csv(LABEL_ROOT + 'train_time.csv')
+df_dev = pd.read_csv(LABEL_ROOT + 'dev_time.csv')
 train_dataset = MDD_Dataset(df_train)
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 model = MFA_Wav2Vec2_Linguistic.from_pretrained(
-    'facebook/wav2vec2-base-100h', 
+    'facebook/wav2vec2-xls-r-300m', 
 )
 model.freeze_feature_extractor()
 model = model.to(device)
@@ -90,7 +99,7 @@ decoder_ctc = build_ctcdecoder(
                               labels = list_vocab,
                               )
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
+optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 ctc_loss = nn.CTCLoss(blank = 68)
 
 for epoch in range(num_epoch):
@@ -114,12 +123,12 @@ for epoch in range(num_epoch):
     # break
   # scheduler.step()
   print(f"Training loss: {sum(running_loss) / len(running_loss)}")
-  if epoch>=5:
+  if epoch >= args.eval_start_epoch:
     with torch.no_grad():
       model.eval().to(device)
       worderrorrate = []
       for point in tqdm(range(len(df_dev))):
-        acoustic, _ = librosa.load("../EN_MDD/WAV/" + df_dev['Path'][point] + ".wav", sr=16000)
+        acoustic, _ = librosa.load(DATA_ROOT + df_dev['Path'][point] + WAV_SUFFIX, sr=16000)
         acoustic = feature_extractor(acoustic, sampling_rate = 16000)
         acoustic = torch.tensor(acoustic.input_values, device=device)
         transcript = df_dev['Transcript'][point]
@@ -145,6 +154,6 @@ for epoch in range(num_epoch):
       if (epoch_wer < min_wer):
         print("save_checkpoint...")
         min_wer = epoch_wer
-        torch.save(model.state_dict(), 'checkpoint/checkpoint_MFA.pth')
+        torch.save(model.state_dict(), CHECKPOINT_DIR + '/checkpoint_MFA.pth')
       print("wer checkpoint " + str(epoch) + ": " + str(epoch_wer))
       print("min_wer: " + str(min_wer))

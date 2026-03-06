@@ -6,6 +6,7 @@ import librosa
 import ast
 from transformers import Wav2Vec2FeatureExtractor
 import json
+from config import DATA_ROOT, WAV_SUFFIX
 
 with open('vocab.json') as f:
     dict_vocab = json.load(f)
@@ -33,7 +34,7 @@ class MDD_Dataset(Dataset):
         self.canonical_time = list(data['Canonical_time'])
 
     def __getitem__(self, index):
-        waveform, _ = librosa.load("../EN_MDD/WAV/" + self.path[index] + ".wav", sr=16000)
+        waveform, _ = librosa.load(DATA_ROOT + self.path[index] + WAV_SUFFIX, sr=16000)
         linguistic  = text_to_tensor(self.canonical[index])
         transcript  = text_to_tensor(self.transcript[index])
         error = self.error[index]

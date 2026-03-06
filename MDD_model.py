@@ -66,10 +66,11 @@ class Wav2Vec2_Linguistic(Wav2Vec2PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.wav2vec2 = Wav2Vec2Model(config)
-        self.classifier_vocab = nn.Linear(1536, 69)
-        self.multihead_attention = nn.MultiheadAttention(embed_dim=768, num_heads=16, dropout=0.2, batch_first=True)
+        hs = config.hidden_size
+        self.classifier_vocab = nn.Linear(hs * 2, 69)
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=hs, num_heads=16, dropout=0.2, batch_first=True)
         self.post_init()
-        self.linguistic_encoder = LinguisticEncoder()
+        self.linguistic_encoder = LinguisticEncoder(num_features_out=hs)
         
     def freeze_feature_extractor(self):
         self.wav2vec2.feature_extractor._freeze_parameters()
@@ -88,12 +89,13 @@ class MFA_Wav2Vec2_Linguistic(Wav2Vec2PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.wav2vec2 = Wav2Vec2Model(config)
-        self.classifier_vocab = nn.Linear(1536, 69)
-        self.multihead_attention_a = nn.MultiheadAttention(embed_dim=768, num_heads=16, dropout=0.2, batch_first=True)
-        self.multihead_attention_l = nn.MultiheadAttention(embed_dim=768, num_heads=16, dropout=0.2, batch_first=True)
-        self.prj_a = nn.Linear(768, 768)
-        self.prj_l = nn.Linear(768, 768)
-        self.embedding = nn.Embedding(69, 768, padding_idx=68)
+        hs = config.hidden_size
+        self.classifier_vocab = nn.Linear(hs * 2, 69)
+        self.multihead_attention_a = nn.MultiheadAttention(embed_dim=hs, num_heads=16, dropout=0.2, batch_first=True)
+        self.multihead_attention_l = nn.MultiheadAttention(embed_dim=hs, num_heads=16, dropout=0.2, batch_first=True)
+        self.prj_a = nn.Linear(hs, hs)
+        self.prj_l = nn.Linear(hs, hs)
+        self.embedding = nn.Embedding(69, hs, padding_idx=68)
         self.post_init()
         
     def freeze_feature_extractor(self):
@@ -115,13 +117,14 @@ class Wav2Vec2_Error(Wav2Vec2PreTrainedModel):
   def __init__(self, config):
       super().__init__(config)
       self.wav2vec2 = Wav2Vec2Model(config)
-      self.classifier_vocab = nn.Linear(768, 69)
-      self.linear1 = nn.Linear(768, 768)
-      self.multihead_attention = nn.MultiheadAttention(embed_dim=768, num_heads=16, dropout=0.2, batch_first=True)
-      self.compare_attention = nn.MultiheadAttention(embed_dim=768, num_heads=16, dropout=0.2, batch_first=True)
+      hs = config.hidden_size
+      self.classifier_vocab = nn.Linear(hs, 69)
+      self.linear1 = nn.Linear(hs, hs)
+      self.multihead_attention = nn.MultiheadAttention(embed_dim=hs, num_heads=16, dropout=0.2, batch_first=True)
+      self.compare_attention = nn.MultiheadAttention(embed_dim=hs, num_heads=16, dropout=0.2, batch_first=True)
       self.post_init()
-      self.embedding = nn.Embedding(69, 768, padding_idx=68)
-      self.error_classifier = nn.Linear(768, 2)
+      self.embedding = nn.Embedding(69, hs, padding_idx=68)
+      self.error_classifier = nn.Linear(hs, 2)
 
   def freeze_feature_extractor(self):
       self.wav2vec2.feature_extractor._freeze_parameters()

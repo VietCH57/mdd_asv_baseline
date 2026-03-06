@@ -8,6 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 from dataloader import text_to_tensor
 from MDD_model import Wav2Vec2_Error, Wav2Vec2_Linguistic
+from config import DATA_ROOT, LABEL_ROOT, WAV_SUFFIX, CHECKPOINT_DIR
 from pyctcdecode import build_ctcdecoder
 
 feature_extractor = Wav2Vec2FeatureExtractor(feature_size=1, sampling_rate=16000, padding_value=0.0, padding_side='right', do_normalize=True, return_attention_mask=False)
@@ -17,12 +18,12 @@ num_epoch = 100
 
 gc.collect()
 
-df_dev = pd.read_csv("./test.csv")
+df_dev = pd.read_csv(LABEL_ROOT + 'test.csv')
 
 model = Wav2Vec2_Linguistic.from_pretrained(
-    'facebook/wav2vec2-base-100h', 
+    'facebook/wav2vec2-xls-r-300m', 
 )
-ckp = torch.load("checkpoint/checkpoint_wl.pth")
+ckp = torch.load(CHECKPOINT_DIR + '/checkpoint_wl.pth')
 model.load_state_dict(ckp)
 model.freeze_feature_extractor()
 model = model.to(device)
@@ -38,7 +39,7 @@ with torch.no_grad():
   model.eval().to(device)
   worderrorrate = []
   for point in tqdm(range(len(df_dev))):
-    acoustic, _ = librosa.load("../EN_MDD/WAV/" + df_dev['Path'][point] + ".wav", sr=16000)
+    acoustic, _ = librosa.load(DATA_ROOT + df_dev['Path'][point] + WAV_SUFFIX, sr=16000)
     acoustic = feature_extractor(acoustic, sampling_rate = 16000)
     acoustic = torch.tensor(acoustic.input_values, device=device)
     transcript = df_dev['Transcript'][point]
